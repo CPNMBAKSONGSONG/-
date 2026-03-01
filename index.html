@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RX-78-2 SKILL HANGAR | 专属技能机库</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* 高达 RX-78-2 经典配色主题 */
+        :root {
+            --gundam-blue: #005C97;
+            --gundam-red: #E81123;
+            --gundam-yellow: #F9D71C;
+            --gundam-white: #F4F6F9;
+            --gundam-dark: #212529;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: var(--gundam-dark);
+            color: var(--gundam-white);
+            margin: 0;
+            padding: 20px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* 隐藏滚动条但保留功能 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--gundam-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--gundam-blue); }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 20px;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 4px solid var(--gundam-red);
+            padding-bottom: 10px;
+        }
+
+        .title {
+            color: var(--gundam-yellow);
+            text-shadow: 2px 2px var(--gundam-red);
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            height: 75vh;
+        }
+
+        /* 左侧导航控制台 */
+        .sidebar {
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            width: 100%;
+            text-align: left;
+            font-size: 10px;
+            padding: 10px;
+        }
+
+        /* 右侧主显示屏幕 */
+        .display-screen {
+            flex-grow: 1;
+            background-color: var(--gundam-white);
+            color: var(--gundam-dark);
+            padding: 20px;
+            overflow-y: auto;
+            border: 4px solid var(--gundam-blue);
+            box-shadow: inset 4px 4px 0px rgba(0,0,0,0.1);
+        }
+
+        /* 模块隐藏控制 */
+        .module { display: none; height: 100%; flex-direction: column;}
+        .module.active { display: flex; }
+
+        /* 技能库布局：左树右编辑 */
+        .arsenal-layout {
+            display: flex;
+            gap: 15px;
+            height: 100%;
+        }
+        .folder-tree {
+            width: 200px;
+            border-right: 4px dashed #ccc;
+            padding-right: 10px;
+            overflow-y: auto;
+        }
+        .folder { cursor: pointer; margin-bottom: 10px; font-size: 10px; color: var(--gundam-blue);}
+        .folder:hover { color: var(--gundam-red); }
+        .sub-folder { margin-left: 15px; display: none; color: #555; margin-top: 5px;}
+        .folder.open .sub-folder { display: block; }
+        
+        .editor-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        textarea.nes-textarea {
+            flex-grow: 1;
+            font-family: inherit;
+            font-size: 12px;
+            resize: none;
+        }
+
+        /* 锁屏界面 */
+        .lock-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            background-color: #000;
+            color: var(--gundam-red);
+        }
+
+        /* 雷达进度条定制 */
+        .mission-item { margin-bottom: 20px; }
+        .mission-item h3 { font-size: 12px; margin-bottom: 5px;}
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="title">SYS.OS // GUNDAM HANGAR_V1.0</div>
+        <div id="boot-text" style="color: #0f0; font-size: 10px;">> System Booting... All Systems Normal. Ready to Launch.</div>
+    </header>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <button class="nes-btn is-primary nav-btn" onclick="switchModule('arsenal')">[1] 装备库 (技能)</button>
+            <button class="nes-btn is-error nav-btn" onclick="switchModule('vault')">[2] 加密舱 (私密)</button>
+            <button class="nes-btn is-success nav-btn" onclick="switchModule('radar')">[3] 任务雷达 (多线)</button>
+            <button class="nes-btn is-warning nav-btn" onclick="switchModule('log')">[4] 机师日志 (爱好)</button>
+        </div>
+
+        <div class="display-screen">
+            
+            <div id="arsenal" class="module active">
+                <h2 style="font-size: 16px; border-bottom: 2px solid #000; padding-bottom: 5px;">> ARSENAL / 技能库</h2>
+                <div class="arsenal-layout">
+                    <div class="folder-tree">
+                        <div class="folder" onclick="toggleFolder(this)">📁 影像创研中心
+                            <div class="sub-folder" onclick="loadFile('ai_video', event)">📄 AI 视频参数库</div>
+                            <div class="sub-folder" onclick="loadFile('pr_edit', event)">📄 剪辑音频衔接</div>
+                        </div>
+                        <div class="folder" onclick="toggleFolder(this)">📁 电商与数据策略
+                            <div class="sub-folder" onclick="loadFile('copywriting', event)">📄 爆款文案库</div>
+                            <div class="sub-folder" onclick="loadFile('competitor', event)">📄 竞品拆解模型</div>
+                        </div>
+                        <div class="folder" onclick="toggleFolder(this)">📁 硬核技术区
+                            <div class="sub-folder" onclick="loadFile('api_script', event)">📄 音视频 API 脚本</div>
+                            <div class="sub-folder" onclick="loadFile('root_guide', event)">📄 手机 Root 指南</div>
+                            <div class="sub-folder" onclick="loadFile('pc_build', event)">📄 剪辑主机配置表</div>
+                        </div>
+                    </div>
+                    <div class="editor-area">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span id="current-file-name" style="color: var(--gundam-blue); font-weight: bold;">未选择文件...</span>
+                            <div>
+                                <button class="nes-btn is-small" onclick="togglePreview()">切换预览</button>
+                                <button class="nes-btn is-success is-small" onclick="saveFile()">保存记录</button>
+                            </div>
+                        </div>
+                        <textarea id="file-editor" class="nes-textarea" placeholder="在这里输入内容，支持 Markdown 语法..."></textarea>
+                        <div id="file-preview" class="nes-container with-title is-dark" style="display: none; flex-grow: 1; overflow-y: auto;">
+                            <p class="title">Markdown 预览</p>
+                            <div id="preview-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="vault" class="module">
+                <div id="lock-ui" class="lock-screen">
+                    <i class="nes-icon is-large star"></i>
+                    <h2>RESTRICTED AREA</h2>
+                    <p>请输入机师授权代码</p>
+                    <div class="nes-field" style="width: 200px; margin: 20px auto;">
+                        <input type="password" id="vault-pwd" class="nes-input" placeholder="输入密码">
+                    </div>
+                    <button class="nes-btn is-error" onclick="unlockVault()">UNLOCK</button>
+                    <p style="font-size: 8px; margin-top: 10px; color: #666;">* 初始密匙测试代码: 0079</p>
+                </div>
+                <div id="vault-content" style="display: none; height: 100%;">
+                    <h2 style="font-size: 16px; border-bottom: 2px solid #E81123; padding-bottom: 5px; color: #E81123;">> VAULT / 机密档案</h2>
+                    <div class="arsenal-layout">
+                        <div class="folder-tree">
+                            <div class="folder" onclick="toggleFolder(this)">📁 商业机密
+                                <div class="sub-folder" onclick="loadFile('ai_platform', event)">📄 AI 中台数据源</div>
+                                <div class="sub-folder" onclick="loadFile('staff_schedule', event)">📄 摄影师排班协同</div>
+                            </div>
+                            <div class="folder" onclick="toggleFolder(this)">📁 财务阵列
+                                <div class="sub-folder" onclick="loadFile('a_shares', event)">📄 A股自选池追踪</div>
+                            </div>
+                        </div>
+                        <div class="editor-area">
+                            <button class="nes-btn is-success is-small" onclick="saveFile()" style="align-self: flex-end;">加密保存</button>
+                            <textarea id="vault-editor" class="nes-textarea" style="border-color: #E81123;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="radar" class="module">
+                <h2 style="font-size: 16px; border-bottom: 2px solid #92CC41; padding-bottom: 5px; color: #92CC41;">> RADAR / 多线任务追踪</h2>
+                
+                <div class="mission-item">
+                    <h3>[主线 Alpha] AI 中台跑通与数据闭环</h3>
+                    <progress class="nes-progress is-success" value="70" max="100"></progress>
+                    <p style="font-size: 10px; margin-top: 5px;">状态: API 接口测试中，汇报 PPT 筹备。</p>
+                </div>
+
+                <div class="mission-item">
+                    <h3>[主线 Beta] 矩阵号视频分发与素材流转</h3>
+                    <progress class="nes-progress is-primary" value="40" max="100"></progress>
+                    <p style="font-size: 10px; margin-top: 5px;">状态: 丁丁表格更新，剪辑师任务已下发。</p>
+                </div>
+
+                <div class="mission-item">
+                    <h3>[支线 Gamma] A股波段策略复盘</h3>
+                    <progress class="nes-progress is-warning" value="90" max="100"></progress>
+                    <p style="font-size: 10px; margin-top: 5px;">状态: 五矿发展等标的走势监控中。</p>
+                </div>
+                
+                <div class="nes-container with-title">
+                    <p class="title">新增任务</p>
+                    <input type="text" class="nes-input" placeholder="输入新任务名称..." style="font-size: 12px;">
+                    <button class="nes-btn is-primary" style="margin-top: 10px; font-size: 12px;">部署任务</button>
+                </div>
+            </div>
+
+            <div id="log" class="module">
+                <h2 style="font-size: 16px; border-bottom: 2px solid #F9D71C; padding-bottom: 5px; color: #B8860B;">> PILOT LOG / 年度航行日志</h2>
+                
+                <div class="nes-container is-rounded" style="margin-bottom: 15px;">
+                    <p style="font-weight: bold; color: var(--gundam-blue);">[ 2026 年度进行中 ]</p>
+                    <ul class="nes-list is-disc" style="font-size: 10px; line-height: 2;">
+                        <li>【器材】Sony FX3 实战测试，探索极致视频画质。</li>
+                        <li>【折腾】成功 Root Nubia 手机，获取系统最高权限。</li>
+                        <li>【装机】研究 i7-14700K 平台，打造最强剪辑生产力工具。</li>
+                    </ul>
+                </div>
+
+                <div class="nes-container is-dark is-rounded" style="margin-bottom: 15px;">
+                    <p style="font-weight: bold; color: #ccc;">[ 归档档案库 ]</p>
+                    <p style="font-size: 10px;">点击下方按钮记录新的爱好或里程碑...</p>
+                    <button class="nes-btn" style="margin-top: 10px; font-size: 10px;">+ 写入新日志</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 模块切换逻辑 ---
+    function switchModule(moduleId) {
+        document.querySelectorAll('.module').forEach(el => el.classList.remove('active'));
+        document.getElementById(moduleId).classList.add('active');
+    }
+
+    // --- 文件夹树状交互 ---
+    function toggleFolder(element) {
+        element.classList.toggle('open');
+    }
+
+    // --- 简易文件系统 (依托 LocalStorage) ---
+    let currentFileId = null;
+    let isVaultFile = false;
+
+    // 预设一些占位内容，让界面不那么空
+    const defaultData = {
+        'ai_video': '## AI 视频生成参数\n- 分辨率: 4K\n- 比例: 9:16\n- 提示词技巧: ...',
+        'api_script': '## Python 任务提交脚本\n```python\nimport requests\nimport json\n\n# 这里写 API 请求逻辑\n```',
+    };
+
+    function loadFile(fileId, event) {
+        event.stopPropagation(); // 防止触发文件夹的折叠
+        currentFileId = fileId;
+        isVaultFile = document.getElementById('vault').classList.contains('active');
+        
+        const fileName = event.target.innerText;
+        const editor = isVaultFile ? document.getElementById('vault-editor') : document.getElementById('file-editor');
+        
+        if (!isVaultFile) {
+            document.getElementById('current-file-name').innerText = '> ' + fileName;
+        }
+
+        // 从本地存储读取，如果没有则读取默认数据，再没有则为空
+        const savedContent = localStorage.getItem('hangar_' + fileId);
+        editor.value = savedContent !== null ? savedContent : (defaultData[fileId] || '');
+        
+        // 如果处于预览模式，刷新预览
+        if (!isVaultFile && document.getElementById('file-preview').style.display === 'block') {
+            updatePreview();
+        }
+    }
+
+    function saveFile() {
+        if (!currentFileId) {
+            alert('警告：未选择目标文件！');
+            return;
+        }
+        const editor = isVaultFile ? document.getElementById('vault-editor') : document.getElementById('file-editor');
+        localStorage.setItem('hangar_' + currentFileId, editor.value);
+        alert('系统提示：数据已成功覆写并保存至本地阵列。');
+    }
+
+    // --- Markdown 预览逻辑 ---
+    function togglePreview() {
+        const editor = document.getElementById('file-editor');
+        const preview = document.getElementById('file-preview');
+        
+        if (editor.style.display === 'none') {
+            editor.style.display = 'block';
+            preview.style.display = 'none';
+        } else {
+            editor.style.display = 'none';
+            preview.style.display = 'block';
+            updatePreview();
+        }
+    }
+
+    function updatePreview() {
+        const text = document.getElementById('file-editor').value;
+        document.getElementById('preview-content').innerHTML = marked.parse(text);
+    }
+
+    // --- 加密舱逻辑 ---
+    function unlockVault() {
+        const pwd = document.getElementById('vault-pwd').value;
+        if (pwd === '0079') { // 预设密码为初代高达年份
+            document.getElementById('lock-ui').style.display = 'none';
+            document.getElementById('vault-content').style.display = 'block';
+        } else {
+            alert('ACCESS DENIED: 机师授权代码错误！');
+        }
+    }
+</script>
+
+</body>
+</html>
